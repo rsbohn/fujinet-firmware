@@ -255,6 +255,8 @@ void fn_service_loop(void *param)
             Debug_print("LYNX-IN: ");
             util_dump_bytes(buf_net, packetSize);
     #endif
+            while (!fnUartSIO.available());
+            fnUartSIO.readBytes(buf_net, packetSize); // Trash what we just sent over serial
         }
 
         // Read the data until there's a pause in the incoming stream
