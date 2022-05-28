@@ -17,6 +17,14 @@
 
 #include "httpService.h"
 
+// For comlynx testing
+#include "fnUDP.h"
+#include "utils.h"
+#include "fnDNS.h"
+#define COMLYNX_BUFFER_SIZE 8192
+#define COMLYNX_PACKET_TIMEOUT 5000
+#define COMLYNX_PORT 6502
+
 #ifdef BLUETOOTH_SUPPORT
 #include "fnBluetooth.h"
 #endif
@@ -204,6 +212,17 @@ void main_setup()
 // Main high-priority service loop
 void fn_service_loop(void *param)
 {
+    // LYNX
+    uint8_t buf_net[COMLYNX_BUFFER_SIZE];
+    uint8_t buf_comlynx[COMLYNX_BUFFER_SIZE];
+    uint8_t buf_comlynx_index=0;
+    const char *comlynx_hostname = "140.141.153.57";
+    in_addr_t comlynx_host_ip = get_ip4_addr_by_name(comlynx_hostname);
+
+    fnUDP udpComlynx;
+    udpComlynx.begin(COMLYNX_PORT);
+
+
     while (true)
     {
         // We don't have any delays in this loop, so IDLE threads will be starved
@@ -216,8 +235,60 @@ void fn_service_loop(void *param)
         else
 #endif // BLUETOOTH_SUPPORT
 
-            SYSTEM_BUS.service();
+        /* LYNX Testing
+        uint8_t b;
+        if (fnUartSIO.available() > 0)
+        {
+            b = (uint8_t)fnUartSIO.read();
+            Debug_printf("RECV: 0x%X\n", b);
+        }*/
+        //SYSTEM_BUS.service();
 
+        // if there’s data available, read a packet
+        int packetSize = udpComlynx.parsePacket();
+        if (packetSize > 0)
+        {
+            udpComlynx.read(buf_net, COMLYNX_BUFFER_SIZE);
+            // Send to Atari UART
+            fnUartSIO.write(buf_net, packetSize);
+    #ifdef DEBUG
+            Debug_print("LYNX-IN: ");
+            util_dump_bytes(buf_net, packetSize);
+    #endif
+        }
+
+        // Read the data until there's a pause in the incoming stream
+        if (fnUartSIO.available() > 0)
+        {
+            while (true)
+            {
+                if (fnUartSIO.available() > 0)
+                {
+                    // Collect bytes read in our buffer
+                    buf_comlynx[buf_comlynx_index] = (char)fnUartSIO.read();
+                    if (buf_comlynx_index < COMLYNX_BUFFER_SIZE - 1)
+                        buf_comlynx_index++;
+                }
+                else
+                {
+                    fnSystem.delay_microseconds(COMLYNX_PACKET_TIMEOUT);
+                    if (fnUartSIO.available() <= 0)
+                        break;
+                }
+            }
+
+            // Send what we've collected over WiFi
+            udpComlynx.beginPacket(comlynx_host_ip, COMLYNX_PORT); // remote IP and port
+            udpComlynx.write(buf_comlynx, buf_comlynx_index);
+            udpComlynx.endPacket();
+
+#ifdef DEBUG
+            Debug_print("LYNX-OUT: ");
+            util_dump_bytes(buf_comlynx, buf_comlynx_index);
+#endif
+            buf_comlynx_index = 0;
+        }
+        
         taskYIELD(); // Allow other tasks to run
     }
 }
