@@ -217,6 +217,7 @@ void fn_service_loop(void *param)
     uint8_t buf_comlynx[COMLYNX_BUFFER_SIZE];
     uint8_t buf_comlynx_index=0;
     const char *comlynx_hostname = "140.141.153.57";
+    //const char *comlynx_hostname = "192.168.1.3";
     in_addr_t comlynx_host_ip = get_ip4_addr_by_name(comlynx_hostname);
 
     fnUDP udpComlynx;
@@ -248,8 +249,10 @@ void fn_service_loop(void *param)
         int packetSize = udpComlynx.parsePacket();
         if (packetSize > 0)
         {
+            unsigned char t=0;
             udpComlynx.read(buf_net, COMLYNX_BUFFER_SIZE);
-            // Send to Atari UART
+
+            // Send to Comlynx
             fnUartSIO.write(buf_net, packetSize);
     #ifdef DEBUG
             Debug_print("LYNX-IN: ");
