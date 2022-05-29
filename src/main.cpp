@@ -22,7 +22,7 @@
 #include "utils.h"
 #include "fnDNS.h"
 #define COMLYNX_BUFFER_SIZE 8192
-#define COMLYNX_PACKET_TIMEOUT 5000
+#define COMLYNX_PACKET_TIMEOUT 7500
 #define COMLYNX_PORT 6502
 
 #ifdef BLUETOOTH_SUPPORT
@@ -43,6 +43,30 @@ void main_shutdown_handler()
     // Give devices an opportunity to clean up before rebooting
 
     SYSTEM_BUS.shutdown();
+}
+
+void wait_for_idle()
+{
+    bool isIdle = false;
+    int64_t start, current, dur;
+
+    do
+    {
+        // Wait for serial line to quiet down.
+        while (fnUartSIO.available() > 0)
+            fnUartSIO.read();
+
+        start = current = esp_timer_get_time();
+
+        while ((fnUartSIO.available() <= 0) && (isIdle == false))
+        {
+            current = esp_timer_get_time();
+            dur = current - start;
+            if (dur > COMLYNX_PACKET_TIMEOUT)
+                isIdle = true;
+        }
+    } while (isIdle == false);
+    fnSystem.yield();
 }
 
 // Initial setup
@@ -215,14 +239,13 @@ void fn_service_loop(void *param)
     // LYNX
     uint8_t buf_net[COMLYNX_BUFFER_SIZE];
     uint8_t buf_comlynx[COMLYNX_BUFFER_SIZE];
-    uint8_t buf_comlynx_index=0;
+    uint8_t buf_comlynx_index = 0;
     const char *comlynx_hostname = "140.141.153.57";
-    //const char *comlynx_hostname = "192.168.1.3";
+    // const char *comlynx_hostname = "192.168.1.3";
     in_addr_t comlynx_host_ip = get_ip4_addr_by_name(comlynx_hostname);
 
     fnUDP udpComlynx;
     udpComlynx.begin(COMLYNX_PORT);
-
 
     while (true)
     {
@@ -236,29 +259,33 @@ void fn_service_loop(void *param)
         else
 #endif // BLUETOOTH_SUPPORT
 
-        /* LYNX Testing
-        uint8_t b;
-        if (fnUartSIO.available() > 0)
-        {
-            b = (uint8_t)fnUartSIO.read();
-            Debug_printf("RECV: 0x%X\n", b);
-        }*/
-        //SYSTEM_BUS.service();
+            /* LYNX Testing
+            uint8_t b;
+            if (fnUartSIO.available() > 0)
+            {
+                b = (uint8_t)fnUartSIO.read();
+                Debug_printf("RECV: 0x%X\n", b);
+            }*/
+            // SYSTEM_BUS.service();
 
-        // if there’s data available, read a packet
-        int packetSize = udpComlynx.parsePacket();
+            // if there’s data available, read a packet
+            int packetSize = udpComlynx.parsePacket();
         if (packetSize > 0)
         {
-            unsigned char t=0;
+            int64_t t = esp_timer_get_time();
+            int64_t u;
+
             udpComlynx.read(buf_net, COMLYNX_BUFFER_SIZE);
 
             // Send to Comlynx
+            wait_for_idle();
             fnUartSIO.write(buf_net, packetSize);
-    #ifdef DEBUG
-            Debug_print("LYNX-IN: ");
-            util_dump_bytes(buf_net, packetSize);
-    #endif
-            while (!fnUartSIO.available());
+#ifdef DEBUG
+            // Debug_print("LYNX-IN: ");
+            // util_dump_bytes(buf_net, packetSize);
+#endif
+            while (!fnUartSIO.available())
+                ;
             fnUartSIO.readBytes(buf_net, packetSize); // Trash what we just sent over serial
         }
 
@@ -288,12 +315,12 @@ void fn_service_loop(void *param)
             udpComlynx.endPacket();
 
 #ifdef DEBUG
-            Debug_print("LYNX-OUT: ");
-            util_dump_bytes(buf_comlynx, buf_comlynx_index);
+            // Debug_print("LYNX-OUT: ");
+            // util_dump_bytes(buf_comlynx, buf_comlynx_index);
 #endif
             buf_comlynx_index = 0;
         }
-        
+
         taskYIELD(); // Allow other tasks to run
     }
 }

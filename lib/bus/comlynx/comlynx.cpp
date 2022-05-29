@@ -181,7 +181,6 @@ void virtualDevice::comlynx_control_ready()
 
 void systemBus::wait_for_idle()
 {
-    return;
     bool isIdle = false;
     int64_t start, current, dur;
 
