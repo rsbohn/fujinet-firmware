@@ -197,30 +197,25 @@ void MediaTypeATX::_wait_full_rotation()
 
 void MediaTypeATX::_wait_head_position(uint16_t pos, uint16_t extra_delay)
 {
+    // Debug_printv("pos: %d, xtra: %d, shifting pos by xtra\n", pos, extra_delay);
     pos += extra_delay;
     if (pos >= ANGULAR_UNIT_TOTAL)
         pos -= ANGULAR_UNIT_TOTAL;
 
     uint16_t current = _get_head_position();
+    // Debug_printv("pos: %d, current: %d - want to get current to pos\n", pos, extra_delay);
 
-    // The head is ahead of the position we want - wait for a roll-over to occur
-    if (pos < current)
+    if (current == pos)
     {
-        //Debug_print("$$$ DEBUG rollover wait\r\n");
-        do
-        {
-            NOP();
-        } while (pos < (current = _get_head_position()));
+        return;
     }
 
-    // The head is behind the position we want - wait for it to reach that position
-    if (pos > current)
+    // we want to wait until current is close to pos
+    while (abs(_get_head_position() - pos) > 1 )
     {
-        do
-        {
-            NOP();
-        } while (pos > _get_head_position());
+        NOP();
     }
+
 }
 
 void MediaTypeATX::_process_sector(AtxTrack &track, AtxSector *psector, uint16_t sectorsize)
