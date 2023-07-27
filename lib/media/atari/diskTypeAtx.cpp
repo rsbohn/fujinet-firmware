@@ -20,6 +20,7 @@
 
 #define ATX_MAGIC_HEADER 0x41543858 // "AT8X"
 #define ATX_DEFAULT_NUMTRACKS 40
+#define HEAD_TOLERANCE 2
 
 /*
   Assuming 288RPM:
@@ -205,13 +206,14 @@ void MediaTypeATX::_wait_head_position(uint16_t pos, uint16_t extra_delay)
     uint16_t current = _get_head_position();
     // Debug_printv("pos: %d, current: %d - want to get current to pos\n", pos, extra_delay);
 
+    // Slightly reworked by Mark J. Fisher (fenrock)
     if (current == pos)
     {
         return;
     }
 
     // we want to wait until current is close to pos
-    while (abs(_get_head_position() - pos) > 1 )
+    while (abs(_get_head_position() - pos) > HEAD_TOLERANCE )
     {
         NOP();
     }
