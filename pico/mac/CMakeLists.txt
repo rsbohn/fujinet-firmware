@@ -48,4 +48,6 @@ target_include_directories(commands PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts or any other standard includes, if required
 )
 
+pico_enable_stdio_usb(commands 1)
+
 pico_add_extra_outputs(commands)
